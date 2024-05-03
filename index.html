@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streamed Response Display</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #response {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: auto;  /* Adjusted for content size */
+            overflow: auto;
+            max-height: 200px;  /* Limit height with overflow */
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <h1 class="mb-3">Query Stream Display</h1>
+        <div class="input-group mb-3">
+            <input type="text" id="queryInput" class="form-control" placeholder="Enter your query">
+            <button class="btn btn-primary" onclick="sendQuery()">Send Query</button>
+        </div>
+        <div id="response" class="bg-light"></div>
+    </div>
+
+    <script>
+        function sendQuery() {
+            const query = document.getElementById('queryInput').value;
+            const responseContainer = document.getElementById('response');
+            responseContainer.innerHTML = '';  // Clear previous responses
+
+            fetch(`https://bursting-allegedly-fawn.ngrok-free.app/derm`, {
+                "method": "POST",
+                "headers": {"Content-Type": "application/json"},
+                "body": JSON.stringify({"query": query})
+            })
+            .then(response => {
+                const reader = response.body.getReader();
+                return new ReadableStream({
+                    start(controller) {
+                        function push() {
+                            reader.read().then(({ done, value }) => {
+                                if (done) {
+                                    controller.close();
+                                    return;
+                                }
+                                // Decode and process the chunk
+                                const text = new TextDecoder().decode(value);
+                                responseContainer.innerHTML += text;  // Append new text to the container
+                                controller.enqueue(value);
+                                push();
+                            }).catch(error => {
+                                console.error('Error while reading the stream:', error);
+                                controller.error(error);
+                            })
+                        }
+                        push();
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+            });
+        }
+    </script>
+</body>
+</html>
